@@ -1,0 +1,19 @@
+# Incident artefacts (generated per-run)
+incidents/
+
+# Monitor logs (generated / appended at runtime)
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# SQLite checkpoint databases
+*.sqlite
+
+# Environment
+.env
+
+# macOS
+.DS_Store

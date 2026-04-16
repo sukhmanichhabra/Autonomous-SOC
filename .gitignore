@@ -1,0 +1,29 @@
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# OS/editor files
+.DS_Store
+.vscode/
+
+# Secrets and local config
+.env
+
+# Local databases and checkpoints
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+
+# Runtime output and local artifacts
+logs/
+incidents/
+my-ai-soc-agent/incidents/
+my-ai-soc-agent/streamlit_checkpoints.sqlite*
+vector_db/chroma_data/
+my-ai-soc-agent/vector_db/chroma_data/

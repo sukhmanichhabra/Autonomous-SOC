@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: soc-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soc-network
+
+  redis:
+    image: redis:alpine
+    container_name: soc-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soc-network
+
+  producer:
+    build:
+      context: .
+    container_name: soc-producer
+    working_dir: /app
+    command: ["python", "producer.py"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM: security_alerts
+      ALERTS_FILE: /app/logs/alerts.txt
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - soc-network
+
+  consumer:
+    build:
+      context: .
+    container_name: soc-consumer
+    working_dir: /app
+    command: ["python", "consumer.py"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM: security_alerts
+      DATABASE_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      DB_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    networks:
+      - soc-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: soc-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@soc.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - soc-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  soc-network:
+    driver: bridge

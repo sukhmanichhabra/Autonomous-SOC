@@ -1,0 +1,21 @@
+# =============================================================
+# Sample alerts log for testing monitor.py
+# =============================================================
+# This file simulates auth.log-style entries.  To test:
+#
+#   Terminal 1 — start the monitor:
+#     cd my-ai-soc-agent
+#     python monitor.py --file sample_alerts.log --threshold 3 --dry-run
+#
+#   Terminal 2 — append lines to trigger an alert:
+#     cd my-ai-soc-agent
+#     echo "Mar  1 10:05:01 server sshd[4321]: Failed password for admin from 10.0.0.50 port 22 ssh2" >> sample_alerts.log
+#     echo "Mar  1 10:05:05 server sshd[4322]: Failed password for admin from 10.0.0.50 port 22 ssh2" >> sample_alerts.log
+#     echo "Mar  1 10:05:09 server sshd[4323]: Failed password for admin from 10.0.0.50 port 22 ssh2" >> sample_alerts.log
+#
+# The third line should trip the threshold (--threshold 3) and fire an alert.
+# =============================================================
+
+Mar  1 09:00:01 server sshd[1001]: Accepted publickey for deploy from 192.168.1.10 port 54321 ssh2
+Mar  1 09:01:15 server sshd[1002]: Accepted password for admin from 192.168.1.20 port 54322 ssh2
+Mar  1 09:15:30 server CRON[1100]: pam_unix(cron:session): session opened for user root

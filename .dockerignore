@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+logs/*.log
+my-ai-soc-agent/streamlit_checkpoints.sqlite*
+my-ai-soc-agent/incidents
+vector_db/chroma_data
+my-ai-soc-agent/vector_db/chroma_data
