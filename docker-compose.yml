@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: ankane/pgvector:latest
@@ -21,10 +19,8 @@ services:
       - soc-network
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: soc-redis
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -32,6 +28,105 @@ services:
       retries: 5
     networks:
       - soc-network
+
+  init-db:
+    build:
+      context: .
+    working_dir: /app
+    command:
+      [
+        "python",
+        "my-ai-soc-agent/init_db.py",
+        "--host",
+        "postgres",
+        "--port",
+        "5432",
+        "--admin-user",
+        "postgres",
+        "--admin-password",
+        "postgres",
+        "--db-name",
+        "soc_agent",
+        "--db-user",
+        "soc_user",
+        "--db-password",
+        "soc_password"
+      ]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: soc_agent
+      DB_USER: soc_user
+      DB_PASSWORD: soc_password
+      DATABASE_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      DB_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      POSTGRES_ADMIN_USER: postgres
+      POSTGRES_ADMIN_PASSWORD: postgres
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - soc-network
+    restart: "no"
+
+  dashboard:
+    build:
+      context: .
+    container_name: soc-dashboard
+    working_dir: /app
+    command:
+      [
+        "python",
+        "-m",
+        "streamlit",
+        "run",
+        "app.py",
+        "--server.address=0.0.0.0",
+        "--server.port=8501"
+      ]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: soc_agent
+      DB_USER: soc_user
+      DB_PASSWORD: soc_password
+      DATABASE_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      DB_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM: security_alerts
+      ALERTS_FILE: /app/logs/alerts.txt
+      NMAP_PATH: nmap
+    env_file:
+      - .env
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    volumes:
+      - ./logs:/app/logs
+      - ./my-ai-soc-agent/incidents:/app/my-ai-soc-agent/incidents
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8501', timeout=5)"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - soc-network
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
 
   producer:
     build:
@@ -46,13 +141,14 @@ services:
     env_file:
       - .env
     volumes:
-      - ./:/app
       - ./logs:/app/logs
     depends_on:
       redis:
         condition: service_healthy
     networks:
       - soc-network
+    profiles:
+      - workers
 
   consumer:
     build:
@@ -68,15 +164,20 @@ services:
     env_file:
       - .env
     volumes:
-      - ./:/app
       - ./logs:/app/logs
+      - ./my-ai-soc-agent/incidents:/app/my-ai-soc-agent/incidents
     depends_on:
       redis:
         condition: service_healthy
       postgres:
-        condition: service_started
+        condition: service_healthy
     networks:
       - soc-network
+    profiles:
+      - workers
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -87,9 +188,12 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - soc-network
+    profiles:
+      - tools
 
 volumes:
   postgres_data:
