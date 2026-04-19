@@ -13,6 +13,7 @@ Features:
 from __future__ import annotations
 
 import os
+import inspect
 from typing import Any, Optional
 
 from langchain_postgres.vectorstores import PGVector
@@ -30,6 +31,53 @@ except ImportError:
     SentenceTransformer = None
 
 from config import settings
+
+
+def _create_pgvector_instance(
+    *,
+    connection_string: str,
+    embeddings: Embeddings,
+    collection_name: str,
+) -> PGVector:
+    """Create a PGVector client across langchain-postgres API variants."""
+    init_sig = inspect.signature(PGVector.__init__)
+    params = init_sig.parameters
+
+    try:
+        from langchain_postgres.vectorstores import connection_string_to_db_url
+        pgvector_connection = connection_string_to_db_url(connection_string)
+    except Exception:
+        if connection_string.startswith("postgresql://"):
+            pgvector_connection = connection_string.replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+        else:
+            pgvector_connection = connection_string
+
+    kwargs: dict[str, Any] = {"collection_name": collection_name}
+
+    if "connection" in params:
+        kwargs["connection"] = pgvector_connection
+    elif "connection_string" in params:
+        kwargs["connection_string"] = connection_string
+    else:
+        raise RuntimeError(
+            "Unsupported PGVector signature: missing 'connection'/'connection_string'"
+        )
+
+    if "embeddings" in params:
+        kwargs["embeddings"] = embeddings
+    elif "embedding_function" in params:
+        kwargs["embedding_function"] = embeddings
+    else:
+        raise RuntimeError(
+            "Unsupported PGVector signature: missing 'embeddings'/'embedding_function'"
+        )
+
+    if "use_jsonb" in params:
+        kwargs["use_jsonb"] = True
+
+    return PGVector(**kwargs)
 
 
 class SimpleEmbedding(Embeddings):
@@ -136,9 +184,9 @@ class ThreatIntelStore:
         
         # Use LangChain's PGVector wrapper
         # This handles table creation, indexing, and similarity search
-        self.store = PGVector(
+        self.store = _create_pgvector_instance(
             connection_string=connection_string,
-            embedding_function=embeddings,
+            embeddings=embeddings,
             collection_name=collection_name,
         )
         

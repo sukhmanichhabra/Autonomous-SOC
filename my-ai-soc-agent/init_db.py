@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -217,12 +218,12 @@ def enable_pgvector_extension(
     host: str,
     port: int,
     db_name: str,
-    db_user: str,
-    db_password: str,
+    admin_user: str,
+    admin_password: str,
 ) -> bool:
-    """Enable pgvector extension in the database."""
+    """Enable pgvector extension in the database using admin credentials."""
     db_conn_string = (
-        f"postgresql://{db_user}:{db_password}@{host}:{port}/{db_name}"
+        f"postgresql://{admin_user}:{admin_password}@{host}:{port}/{db_name}"
     )
     
     try:
@@ -304,14 +305,46 @@ def create_pgvector_tables(
         # Import here to avoid failures if langchain isn't fully installed
         from langchain_postgres.vectorstores import PGVector
         from vector_db.pgvector_store import get_embeddings
+
+        try:
+            from langchain_postgres.vectorstores import connection_string_to_db_url
+            pgvector_connection = connection_string_to_db_url(db_conn_string)
+        except Exception:
+            if db_conn_string.startswith("postgresql://"):
+                pgvector_connection = db_conn_string.replace(
+                    "postgresql://", "postgresql+psycopg://", 1
+                )
+            else:
+                pgvector_connection = db_conn_string
+
+        init_sig = inspect.signature(PGVector.__init__)
+        params = init_sig.parameters
+
+        kwargs = {"collection_name": "threat_intel"}
+        if "connection" in params:
+            kwargs["connection"] = pgvector_connection
+        elif "connection_string" in params:
+            kwargs["connection_string"] = db_conn_string
+        else:
+            raise RuntimeError(
+                "Unsupported PGVector signature: missing 'connection'/'connection_string'"
+            )
         
         # Create the vector store - this auto-creates tables
         embeddings = get_embeddings()
-        store = PGVector(
-            connection_string=db_conn_string,
-            embedding_function=embeddings,
-            collection_name="threat_intel",
-        )
+        if "embeddings" in params:
+            kwargs["embeddings"] = embeddings
+        elif "embedding_function" in params:
+            kwargs["embedding_function"] = embeddings
+        else:
+            raise RuntimeError(
+                "Unsupported PGVector signature: missing 'embeddings'/'embedding_function'"
+            )
+
+        if "use_jsonb" in params:
+            kwargs["use_jsonb"] = True
+
+        PGVector(**kwargs)
         
         log("pgvector tables created", "SUCCESS")
         return True
@@ -337,7 +370,7 @@ def write_env_file(
         # Read existing .env if it exists
         env_content = ""
         if Path(env_path).exists():
-            with open(env_path, "r") as f:
+            with open(env_path, "r", encoding="utf-8", errors="replace") as f:
                 env_content = f.read()
         
         # Update or add DATABASE_URL and DB_URL
@@ -361,7 +394,7 @@ def write_env_file(
         if not found_db_url:
             updated_lines.append(f"DB_URL={db_url}")
         
-        with open(env_path, "w") as f:
+        with open(env_path, "w", encoding="utf-8", newline="\n") as f:
             f.write("\n".join(updated_lines))
         
         log(f"Updated {env_path} with DATABASE_URL and DB_URL", "SUCCESS")
@@ -410,8 +443,8 @@ def main():
         args.host,
         args.port,
         args.db_name,
-        args.db_user,
-        args.db_password,
+        args.admin_user,
+        args.admin_password,
     ):
         log("Continuing without pgvector (will be needed for vector search)", "WARNING")
     
