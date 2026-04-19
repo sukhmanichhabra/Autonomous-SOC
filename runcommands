@@ -1,0 +1,13 @@
+cd /path/to/Additional_Project
+cp .env.example .env
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r my-ai-soc-agent/requirements.txt
+docker compose up -d postgres redis
+python my-ai-soc-agent/init_db.py
+streamlit run app.py
+python my-ai-soc-agent/main.py --target 127.0.0.1
+python producer.py
+python consumer.py
+docker compose up -d producer consumer pgadmin

@@ -373,7 +373,7 @@ def run_pipeline(target: str, model: str, api_key_val: str, do_seed: bool, steal
 
     # ── Check for interrupt (human approval via interrupt_before) ──
     graph_state = graph.get_state(config)
-    has_interrupt = graph_state.next and "response" in graph_state.next
+    has_interrupt = graph_state.next and "human_review" in graph_state.next
 
     if has_interrupt:
         # Store graph + config in session state so the approval
@@ -478,9 +478,9 @@ if st.session_state.get("approval_processed") and st.session_state.get("pending_
                     "final_decision": "Rejected by Human Operator",
                     "response_plan": "",
                     "final_remediation_plan": "",
-                    "current_agent": "response",
+                    "current_agent": "human_review",
                 },
-                as_node="response",
+                as_node="human_review",
             )
             final_state = graph.get_state(config).values
         label = "✅ Remediation plan approved — audit finalised." if answer == "y" \

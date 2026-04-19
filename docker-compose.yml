@@ -1,4 +1,31 @@
 services:
+  app:
+    build:
+      context: .
+    container_name: soc-app
+    working_dir: /app
+    command: ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    ports:
+      - "8501:8501"
+    environment:
+      DATABASE_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      DB_URL: postgresql://soc_user:soc_password@postgres:5432/soc_agent
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM: security_alerts
+      NMAP_PATH: nmap
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - soc-network
+
   postgres:
     image: ankane/pgvector:latest
     container_name: soc-postgres

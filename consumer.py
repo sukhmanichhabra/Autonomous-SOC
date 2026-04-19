@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import uuid
+import importlib
 from pathlib import Path
 
 import redis  # type: ignore[import-not-found]
@@ -15,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 PROJECT_PKG = PROJECT_ROOT / "my-ai-soc-agent"
 sys.path.insert(0, str(PROJECT_PKG))
 
-import app as streamlit_app
+graph_factory = importlib.import_module("graph_factory")
 
 
 def _parse_event(fields: dict) -> dict | None:
@@ -61,8 +62,8 @@ def main() -> None:
 
     last_id = "$"
 
-    checkpointer = streamlit_app.get_worker_checkpointer()
-    graph = streamlit_app.get_compiled_graph_for_worker(checkpointer=checkpointer)
+    checkpointer = graph_factory.get_worker_checkpointer()
+    graph = graph_factory.get_compiled_graph_for_worker(checkpointer=checkpointer)
     print(f"[Consumer] Listening on stream '{stream_name}'")
 
     while True:

@@ -247,14 +247,14 @@ class ThreatIntelStore:
             metadatas = []
             
             for doc, score in results:
-                documents.append([doc.page_content])
-                metadatas.append([doc.metadata])
-                distances.append([1.0 - score])  # Convert similarity to distance
+                documents.append(doc.page_content)
+                metadatas.append(doc.metadata)
+                distances.append(1.0 - score)  # Convert similarity to distance
             
             return {
-                "documents": documents,
-                "metadatas": metadatas,
-                "distances": distances,
+                "documents": [documents],
+                "metadatas": [metadatas],
+                "distances": [distances],
             }
         except Exception as e:
             print(f"[ThreatIntelStore] Query failed: {e}")
